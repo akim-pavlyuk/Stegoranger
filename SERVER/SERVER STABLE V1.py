@@ -11,8 +11,17 @@ SEPARATOR = '<SEPARATOR>'
 BUFFER_SIZE = 1024
 NUMS_OF_CLIENT = 1
 
+
 class Server:
     def __init__(self, host, port):
+
+        self.input_area = None
+        self.send_button = None
+        self.exit_button = None
+        self.msg_label = None
+        self.text_area = None
+        self.chat_label = None
+        self.win = None
 
         self.gui_thread = threading.Thread(target=self.gui_loop)
         self.gui_thread.start()
@@ -31,7 +40,6 @@ class Server:
         print('[+] Client (' + str(self.client_info[0]) + ') connected.')
         self.gui_done = False
 
-
         rec = threading.Thread(target=self.listening)
         rec.start()
 
@@ -48,7 +56,10 @@ class Server:
                 while True:
                     print('[cmd] Waiting for command...')
 
-                    if command == None:
+                    filename = '[empty]'
+                    file_size = 0
+
+                    if command is None:
                         command = self.socket_client.recv(32).decode()
 
                     if command:
@@ -56,26 +67,26 @@ class Server:
 
                     if command == 'send':
                         command = None
-                        self.socket_client.sendall(b'sendok')
+                        self.socket_client.sendall(b'send_ok')
 
-                    if command == 'finfo':
+                    if command == 'file_info':
                         command = None
-                        finfo = self.socket_client.recv(1024).decode()
-                        print(finfo)
-                        if SEPARATOR not in finfo:
-                            self.socket_client.sendall(b'finfo_error')
+                        file_info = self.socket_client.recv(1024).decode()
+                        print(file_info)
+                        if SEPARATOR not in file_info:
+                            self.socket_client.sendall(b'file_info_error')
                             break
                         else:
-                            filename, filesize = finfo.split(SEPARATOR)
-                            filesize = int(filesize)
-                        self.socket_client.sendall(b'finfok')
+                            filename, file_size = file_info.split(SEPARATOR)
+                            file_size = int(file_size)
+                        self.socket_client.sendall(b'file_info_ok')
 
                     if command == 'img':
                         command = None
-                        print('[img] File name: ' + filename + ' | File size: ' + str(filesize) + '.')
+                        print('[img] File name: ' + filename + ' | File size: ' + str(file_size) + '.')
                         file = open('recv/' + filename, 'wb')
-                        recvd = b''
-                        while filesize > len(recvd):
+                        received_msg = b''
+                        while file_size > len(received_msg):
                             data = self.socket_client.recv(BUFFER_SIZE)
 
                             if b'send' in data:
@@ -87,9 +98,9 @@ class Server:
                             if not data:
                                 break
 
-                            recvd += data
+                            received_msg += data
                             file.write(data)
-                            print('[rcv] Received ' + str(len(recvd)) + '/' + str(filesize) + '.')
+                            print('[rcv] Received ' + str(len(received_msg)) + '/' + str(file_size) + '.')
 
                     if command == 'end':
                         command = None
@@ -102,49 +113,48 @@ class Server:
             if command == 'recv':
                 print(self.msg_count)
                 for i in range(0, self.msg_count + 1):
-                    #---------Send command---------
+                    # ---------Send command---------
                     print('Connected...')
                     time.sleep(0.1)
                     self.socket_client.sendall('send'.encode())
                     print('sending...')
 
-                    #---------Read file------------
+                    # ---------Read file------------
                     filename = str(i) + '_msg.jpg'
                     if i == self.msg_count:
                         filename = 'end.jpg'
-                    data = None
+                    # data = None
                     print(filename)
 
                     with open('4send/' + filename, 'rb') as f:
                         data = f.read()
 
-                    #--------Beginning sending process--------------
+                    # --------Beginning sending process--------------
                     while True:
-                        cmd = self.socket_client.recv(32).decode();
+                        cmd = self.socket_client.recv(32).decode()
 
                         if cmd:
-                            print(cmd);
+                            print(cmd)
 
-                        #---------Receiving sendok-----
-                        if cmd == 'sendok':
-                            self.socket_client.sendall('finfo'.encode());
+                        # ---------Receiving send_ok-----
+                        if cmd == 'send_ok':
+                            self.socket_client.sendall('file_info'.encode())
                             time.sleep(0.1)
-##                            temp = (str(filename) +'<SEPARATOR>' + '%16d' % len(data)).encode()
-                            temp = (str(filename) +'<SEPARATOR>' + str(len(data))).encode()
-                            print(temp);
-                            self.socket_client.sendall(temp);
+                            temp = (str(filename) + '<SEPARATOR>' + str(len(data))).encode()
+                            print(temp)
+                            self.socket_client.sendall(temp)
 
-                        #--------Receiving finfok------
-                        if cmd == 'finfok':
+                        # --------Receiving file_info_ok------
+                        if cmd == 'file_info_ok':
                             self.socket_client.sendall('img'.encode())
                             time.sleep(0.1)
                             self.socket_client.sendall(data)
                             print('File transmission done.')
-##                            time.sleep(0.5)
+                            # time.sleep(0.5)
                             break
 
                 self.msg_count = 0
-                self.socket_client.sendall('end'.encode());
+                self.socket_client.sendall('end'.encode())
 
     def send(self):
         message = self.input_area.get(1.0, END)
@@ -157,94 +167,46 @@ class Server:
         self.msg_count = img_coder.SelectionImages(message)
         self.socket_client.sendall(b'write')
 
-##        self.receive_thread.pause();
-##        for i in range(6,10):
-##            #---------Send command---------
-##            print('Connected...')
-##            time.sleep(0.1);
-##            self.socket_client.sendall('send'.encode());
-##
-##            #---------Read file------------
-##            filename = (str(i+1) + '.jpg')
-##            if i==3:
-##                filename = 'end.jpg'
-##            data = None
-##
-##            with open(filename, 'rb') as f:
-##                data = f.read()
-##
-##            #--------Beginning sending process--------------
-##            while True:
-##                cmd = self.socket_client.recv(32).decode();
-##
-##                if cmd:
-##                    print(cmd);
-##
-##                #---------Receiving sendok-----
-##                if cmd == "sendok":
-##                    self.socket_client.sendall('finfo'.encode());
-##                    temp = (str(filename) +'<SEPARATOR>' + '%16d' % len(data)).encode();
-##                    print(temp);
-##                    self.socket_client.sendall(temp);
-##
-##                #--------Receiving finfok------
-##                if cmd == "finfok":
-##                    self.socket_client.sendall('img'.encode());
-##                    self.socket_client.sendall(data)
-##                    print('File transmission done.')
-##                    break
-##
-##        self.sock.sendall('end'.encode());
-##        self.receive_thread.start(self.sock);
-
-
     def send_th(self):
-        send_thread = threading.Thread(target = self.send)
+        send_thread = threading.Thread(target=self.send)
         send_thread.start()
-##        self.receive_thread.
 
     def exit(self):
-            print('[*] Disconnecting...')
-            try:
-                self.socket_client.close()
-                self.socket_server.close()
-            except:
-                self.socket_server.close()
-            finally:
-                print('[-] Disconnected111111.')
+        print('[*] Disconnecting...')
+        try:
+            self.socket_client.close()
+            self.socket_server.close()
+        finally:
             print('[-] Disconnected.')
+        print('[-] Disconnected with errors.')
 
     def gui_loop(self):
-        self.win = Tk();
-        self.win.title("Server 1.3s");
-        self.win.configure(bg="lightgray");
+        self.win = Tk()
+        self.win.title("Server 1.3s")
+        self.win.configure(bg="lightgray")
 
         self.chat_label = Label(self.win, text="Chat:", bg="lightgray")
         self.chat_label.config(font=("Arial", 12))
-        self.chat_label.grid(row = 0, column = 0, columnspan = 3)
+        self.chat_label.grid(row=0, column=0, columnspan=3)
 
         self.text_area = scrolledtext.ScrolledText(self.win)
-        self.text_area.grid(row = 1, column = 0, columnspan = 3, rowspan = 5)
-        self.text_area.config(state = 'disabled')
+        self.text_area.grid(row=1, column=0, columnspan=3, rowspan=5)
+        self.text_area.config(state='disabled')
 
         self.msg_label = Label(self.win, text="Message:", bg="lightgray")
         self.msg_label.config(font=("Arial", 12))
-        self.msg_label.grid(row = 6, column = 0, columnspan = 3)
+        self.msg_label.grid(row=6, column=0, columnspan=3)
 
         self.input_area = Text(self.win, height=5)
-        self.input_area.grid(row = 7, column = 0, columnspan = 3)
+        self.input_area.grid(row=7, column=0, columnspan=3)
 
-##        self.start_button = Button(self.win, text = "Host")
-##        self.start_button.config(font=("Arial", 12))
-##        self.start_button.grid(row = 8, column = 0)
-
-        self.send_button = Button(self.win, text="Send", command = self.send_th)
+        self.send_button = Button(self.win, text="Send", command=self.send_th)
         self.send_button.config(font=("Arial", 12))
-        self.send_button.grid(row = 8, column = 1)
+        self.send_button.grid(row=8, column=1)
 
-        self.exit_button = Button(self.win, text="Exit", command = self.exit)
+        self.exit_button = Button(self.win, text="Exit", command=self.exit)
         self.exit_button.config(font=("Arial", 12))
-        self.exit_button.grid(row = 8, column = 2)
+        self.exit_button.grid(row=8, column=2)
 
         self.gui_done = True
 
