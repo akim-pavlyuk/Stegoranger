@@ -2,17 +2,24 @@ import socket
 from tkinter import *
 import tkinter.scrolledtext as scrolledtext
 import threading
-from tkinter import filedialog as fd
-import time, img_coder
+import time
+import img_coder
 
-HOST = 'localhost' #my ip
+HOST = 'localhost'  # my ip
 PORT = 1234
 SEPARATOR = '<SEPARATOR>'
 BUFFER_SIZE = 1024
 
+
 class Client:
     def __init__(self, host, port):
 
+        self.send_button = None
+        self.input_area = None
+        self.msg_label = None
+        self.text_area = None
+        self.chat_label = None
+        self.win = None
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.connect((host, port))
 
@@ -24,7 +31,7 @@ class Client:
         self.receive_thread = threading.Thread(target=self.listening)
 
         self.gui_thread.start()
-        self.receive_thread.start();
+        self.receive_thread.start()
 
     def gui_loop(self):
         self.win = Tk()
@@ -55,7 +62,6 @@ class Client:
         self.win.protocol("WM_DELETE_WINDOW", self.stop)
         self.win.mainloop()
 
-
     def write(self):
         message = self.input_area.get(1.0, END)
         print('[msg] ME: ' + message)
@@ -80,13 +86,15 @@ class Client:
                 command = None
                 self.sock.sendall(b'recv')
                 img_coder.ClearDirectory()
+
+                filename = '[empty]'
+                file_size = 0
                 while True:
                     print('[cmd] Waiting for command...')
 
-                    if command == None:
+                    if command is None:
                         command = self.sock.recv(32).decode()
 
-                    #command = self.sock.recv(32).decode()
                     if command:
                         print('[cmd] ' + command)
 
@@ -95,26 +103,26 @@ class Client:
 
                     if command == 'send':
                         command = None
-                        self.sock.sendall(b'sendok')
+                        self.sock.sendall(b'send_ok')
 
-                    if command == 'finfo':
+                    if command == 'file_info':
                         command = None
-                        finfo = self.sock.recv(1024).decode()
-                        print(finfo)
-                        if SEPARATOR not in finfo:
-                            self.sock.sendall(b'finfo_error')
+                        file_info = self.sock.recv(1024).decode()
+                        print(file_info)
+                        if SEPARATOR not in file_info:
+                            self.sock.sendall(b'file_info_error')
                             break
                         else:
-                            filename, filesize = finfo.split(SEPARATOR)
-                            filesize = int(filesize)
-                        self.sock.sendall(b'finfok')
+                            filename, file_size = file_info.split(SEPARATOR)
+                            file_size = int(file_size)
+                        self.sock.sendall(b'file_info_ok')
 
                     if command == 'img':
                         command = None
-                        print('[img] File name: ' + filename + ' | File size: ' + str(filesize) + '.')
+                        print('[img] File name: ' + filename + ' | File size: ' + str(file_size) + '.')
                         file = open('recv/' + filename, 'wb')
-                        recvd = b''
-                        while filesize > len(recvd):
+                        received_msg = b''
+                        while file_size > len(received_msg):
                             data = self.sock.recv(BUFFER_SIZE)
 
                             if b'send' in data:
@@ -125,9 +133,9 @@ class Client:
 
                             if not data:
                                 break
-                            recvd += data
+                            received_msg += data
                             file.write(data)
-                            print('[rcv] Received ' + str(len(recvd)) + '/' + str(filesize) + '.')
+                            print('[rcv] Received ' + str(len(received_msg)) + '/' + str(file_size) + '.')
 
                     if command == 'end':
                         command = None
@@ -140,38 +148,37 @@ class Client:
             if command == 'recv':
                 print(self.msg_count)
                 for i in range(0, self.msg_count + 1):
-                    #---------Send command---------
+                    # ---------Send command---------
                     print('Connected...')
                     time.sleep(0.1)
                     self.sock.sendall('send'.encode())
                     print('sending...')
 
-                    #---------Read file------------
+                    # ---------Read file------------
                     filename = str(i) + '_msg.jpg'
                     if i == self.msg_count:
                         filename = 'end.jpg'
-                    data = None
                     print(filename)
 
                     with open('4send/' + filename, 'rb') as f:
                         data = f.read()
 
-                    #--------Beginning sending process--------------
+                    # --------Beginning sending process--------------
                     while True:
-                        cmd = self.sock.recv(32).decode();
+                        cmd = self.sock.recv(32).decode()
 
                         if cmd:
-                            print(cmd);
+                            print(cmd)
 
-                        #---------Receiving sendok-----
-                        if cmd == 'sendok':
-                            self.sock.sendall('finfo'.encode());
-                            temp = (str(filename) +'<SEPARATOR>' + str(len(data))).encode()
-                            print(temp);
-                            self.sock.sendall(temp);
+                        # ---------Receiving send_ok-----
+                        if cmd == 'send_ok':
+                            self.sock.sendall('file_info'.encode())
+                            temp = (str(filename) + '<SEPARATOR>' + str(len(data))).encode()
+                            print(temp)
+                            self.sock.sendall(temp)
 
-                        #--------Receiving finfok------
-                        if cmd == 'finfok':
+                        # --------Receiving file_info_ok------
+                        if cmd == 'file_info_ok':
                             self.sock.sendall('img'.encode())
                             time.sleep(0.1)
                             self.sock.sendall(data)
@@ -179,6 +186,7 @@ class Client:
                             break
 
                 self.msg_count = 0
-                self.sock.sendall('end'.encode());
+                self.sock.sendall('end'.encode())
+
 
 client = Client(HOST, PORT)
